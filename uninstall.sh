@@ -6,7 +6,7 @@ echo "==> Stopping and disabling MPD user service..."
 systemctl --user disable --now mpd.service 2>/dev/null || true
 
 echo "==> Removing MPD config and data..."
-rm -rf "$HOME/.config/mpd" "$HOME/.local/share/mpd"
+rm -rf "$HOME/.config/mpd" "$HOME/.local/share/mpd" "$HOME/.local/share/mpdscale" "$HOME/.config/systemd/user/mpd.service.d"
 
 read -rp "Also remove packages (mpd, mpc)? [y/N] " yn
 if [[ "$yn" =~ ^[Yy]$ ]]; then

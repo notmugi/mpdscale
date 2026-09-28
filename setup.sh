@@ -25,34 +25,13 @@ case "${1:---start}" in
     *) die "Unknown flag '$1'. Use --start, --stop, or --restart." ;;
 esac
 
-# Enable/disable MPD outputs by exact name.
-# $1 = space-separated names to enable, $2 = names to disable.
-set_outputs() {
-    local enable_names="$1" disable_names="$2" line id name
-    while read -r line; do
-        id="$(grep -oP 'Output \K[0-9]+' <<< "$line")"
-        name="$(sed -E 's/Output [0-9]+ \((.*)\) is .*/\1/' <<< "$line")"
-        [[ -z "$id" || -z "$name" ]] && continue
-        if [[ " ${enable_names} " == *" ${name} "* ]]; then
-            mpc enable "$id" >/dev/null 2>&1
-        elif [[ " ${disable_names} " == *" ${name} "* ]]; then
-            mpc disable "$id" >/dev/null 2>&1
-        fi
-    done <<< "$(mpc outputs 2>/dev/null)"
-}
-
-phone_only() {  # streams on, local speakers off
-    set_outputs "Phone Stream Phone Stream (Cellular)" "Local Playback"
-}
-local_only() {  # local speakers on, streams off
-    set_outputs "Local Playback" "Phone Stream Phone Stream (Cellular)"
-}
+HELPER="$HOME/.local/share/mpdscale/mpdscale-outputs.sh"
 
 do_stop() {
     info "Stopping playback..."
     mpc stop >/dev/null 2>&1 || true
     info "Switching audio to local machine only..."
-    local_only
+    "$HELPER" local 2>/dev/null || true
     info "Stopping Tailscale (remote access off; MPD keeps running locally for ncmpcpp)..."
     sudo systemctl stop tailscaled 2>/dev/null || true
     ok "Stopped — phone disconnected, audio plays on this machine"
@@ -203,9 +182,22 @@ ok "MPD running (user service, socket-activated; start with: systemctl --user st
 # Linger is NOT enabled: MPD runs only while you're logged in.
 # For a headless always-on server, run: sudo loginctl enable-linger "$USER"
 
+# ------------------------------------------------- output mode automation
+# Install the output-switch helper and a systemd hook so MPD always starts
+# in the right mode: phone outputs if tailscaled is up, local otherwise.
+info "Installing output-mode automation..."
+mkdir -p "$HOME/.local/share/mpdscale" "$HOME/.config/systemd/user/mpd.service.d"
+install -m 755 "$SCRIPT_DIR/mpdscale-outputs.sh" "$HELPER"
+cat > "$HOME/.config/systemd/user/mpd.service.d/outputs.conf" <<EOF
+[Service]
+ExecStartPost=$HELPER auto
+EOF
+systemctl --user daemon-reload
+ok "MPD will default to local audio unless remote access is up"
+
 # Audio goes to the phone only while remote access is up
 info "Switching audio to phone streams only (local speakers off)..."
-phone_only
+"$HELPER" phone
 ok "Outputs: streams on, local off"
 
 # ------------------------------------------------------------------ summary
