@@ -59,6 +59,17 @@ if ! tailscale status >/dev/null 2>&1; then
     fi
 fi
 
+# If firewalld is running, trust the tailnet interface so phone traffic
+# isn't dropped (default zone blocks inbound 6600/8000).
+if systemctl is-active --quiet firewalld; then
+    if ! sudo firewall-cmd --permanent --zone=trusted --query-interface=tailscale0 2>/dev/null; then
+        info "firewalld detected — adding tailscale0 to the trusted zone"
+        sudo firewall-cmd --permanent --zone=trusted --add-interface=tailscale0
+        sudo firewall-cmd --reload
+        ok "tailscale0 trusted in firewalld"
+    fi
+fi
+
 TS_IP="$(tailscale ip -4 | head -n1)"
 [[ -n "$TS_IP" ]] || die "Could not determine Tailscale IPv4 address."
 TS_HOSTNAME="$(tailscale status --json | grep -oP '"DNSName":\s*"\K[^"]+' | sed 's/\.$//' || true)"
