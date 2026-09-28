@@ -139,6 +139,10 @@ warn "If ncmpcpp needs the DB/playlists, they now live in $MPD_DATA_DIR (was pos
 info "Starting MPD user service (NOT enabled — opt-in, won't auto-start at login)..."
 systemctl --user daemon-reload
 systemctl --user start mpd.socket
+if systemctl --user is-active --quiet mpd.service; then
+    # Already running with the OLD config — restart so the new one applies
+    systemctl --user restart mpd.service
+fi
 ok "MPD running (user service, socket-activated; start with: systemctl --user start mpd.socket)"
 
 # Linger is NOT enabled: MPD runs only while you're logged in.
@@ -153,14 +157,17 @@ echo " Control (port 6600):"
 echo "   Host:     $TS_IP   (or ${TS_HOSTNAME:-<hostname>.ts.net})"
 echo "   Password: (none)"
 echo
-echo " Stream URL (for 'stream playback' in your client):"
-echo "   http://${TS_HOSTNAME:-$TS_IP}:8000"
+echo " Stream URLs (for 'local playback' in your client):"
+echo "   http://${TS_HOSTNAME:-$TS_IP}:8000  (MP3 192k — wifi)"
+echo "   http://${TS_HOSTNAME:-$TS_IP}:8001  (Opus 96k — cellular)"
 echo
 echo " Phone setup:"
 echo "   1. Install the Tailscale app and sign into the same tailnet"
-echo "   2. Android: M.A.L.P. / MPDroid  •  iOS: MaximumMPD / Rigelian"
+echo "   2. Android: M.A.L.P.  •  iOS: MPD Pilot (both free, control + listen)"
 echo "   3. Add a connection with the host above (no password)"
-echo "   4. Enable streaming output ('Phone Stream') to hear audio"
+echo "   4. Point its 'local playback/stream URL' at a stream:"
+echo "      http://${TS_HOSTNAME:-$TS_IP}:8001  (Opus 96k — cellular/low data)"
+echo "      http://${TS_HOSTNAME:-$TS_IP}:8000  (MP3 192k — wifi)"
 echo
 echo " Useful commands:"
 echo "   systemctl --user start mpd.socket   # start MPD (does not auto-start)
