@@ -21,9 +21,11 @@ command -v pacman >/dev/null || die "pacman not found — this script targets Ar
 
 # ---------------------------------------------------------------- config file
 ENV_FILE="$SCRIPT_DIR/.env"
+MUSIC_DIR_SET=""
 if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
     source "$ENV_FILE"
+    [[ -n "${MUSIC_DIR:-}" ]] && MUSIC_DIR_SET=1
     info "Loaded settings from .env"
 fi
 
@@ -66,6 +68,56 @@ TS_IP="$(tailscale ip -4 | head -n1)"
 TS_HOSTNAME="$(tailscale status --json | grep -oP '"DNSName":\s*"\K[^"]+' | sed 's/\.$//' || true)"
 ok "Tailscale up — IP: $TS_IP  Hostname: ${TS_HOSTNAME:-unknown}"
 
+# ------------------------------------------------- existing install detect
+EXISTING_CONF=""
+for candidate in "$MPD_CONFIG_DIR/mpd.conf" /etc/mpd.conf; do
+    [[ -f "$candidate" ]] && EXISTING_CONF="$candidate" && break
+done
+
+if [[ -n "$EXISTING_CONF" && -z "$MUSIC_DIR_SET" && "${MUSIC_DIR}" == "$HOME/Music" ]]; then
+    # Adopt the music dir from the existing config
+    detected="$(grep -m1 -oP '^\s*music_directory\s+"\K[^"]+' "$EXISTING_CONF" || true)"
+    detected="${detected/#\~/$HOME}"
+    if [[ -n "$detected" && -d "$detected" ]]; then
+        MUSIC_DIR="$detected"
+        info "Adopted music directory from existing config: $MUSIC_DIR"
+    fi
+fi
+
+# Is an MPD already running? (user service, system service, or manual)
+MPD_WAS_RUNNING=""
+if systemctl --user is-active --quiet mpd.service 2>/dev/null; then
+    MPD_WAS_RUNNING="user"
+elif systemctl is-active --quiet mpd.service 2>/dev/null; then
+    MPD_WAS_RUNNING="system"
+    warn "A SYSTEM mpd.service is running."
+    warn "This script sets up a USER service. The system one will conflict (port 6600)."
+    read -rp "Stop & disable the system mpd.service and switch to the user service? [Y/n] " yn
+    if [[ "${yn:-Y}" =~ ^[Yy]?$ ]]; then
+        sudo systemctl disable --now mpd.service
+        ok "System mpd.service disabled"
+    else
+        die "Cannot continue while system mpd.service holds port 6600."
+    fi
+elif pgrep -x mpd >/dev/null 2>&1; then
+    MPD_WAS_RUNNING="manual"
+    warn "An MPD process is already running outside systemd — it will conflict on port 6600."
+    read -rp "Kill it and let the user service take over? [Y/n] " yn
+    if [[ "${yn:-Y}" =~ ^[Yy]?$ ]]; then
+        pkill -x mpd || true
+        sleep 1
+    else
+        die "Cannot continue while another MPD process holds port 6600."
+    fi
+fi
+
+# Back up an existing user config instead of clobbering it
+if [[ -f "$MPD_CONFIG_DIR/mpd.conf" ]]; then
+    backup="$MPD_CONFIG_DIR/mpd.conf.bak.$(date +%Y%m%d-%H%M%S)"
+    cp -a "$MPD_CONFIG_DIR/mpd.conf" "$backup"
+    warn "Existing config backed up to: $backup"
+fi
+
 # ----------------------------------------------------------------- mpd conf
 info "Writing MPD config to $MPD_CONFIG_DIR/mpd.conf"
 mkdir -p "$MPD_CONFIG_DIR" "$MPD_DATA_DIR/playlists"
@@ -76,11 +128,17 @@ sed -e "s|__MUSIC_DIR__|$MUSIC_DIR|g" \
     "$SCRIPT_DIR/mpd.conf" > "$MPD_CONFIG_DIR/mpd.conf"
 chmod 600 "$MPD_CONFIG_DIR/mpd.conf"   # contains the password
 ok "Config written"
+warn "ncmpcpp note: your existing client connects to localhost — that still works."
+warn "If ncmpcpp needs the DB/playlists, they now live in $MPD_DATA_DIR (was possibly elsewhere)."
 
 # ------------------------------------------------------------- user service
 info "Enabling MPD user service..."
 systemctl --user daemon-reload
-systemctl --user enable --now mpd.service
+if [[ -n "$MPD_WAS_RUNNING" ]]; then
+    systemctl --user restart mpd.service
+else
+    systemctl --user enable --now mpd.service
+fi
 ok "MPD running (user service)"
 
 # Keep user services alive without an active login session (headless servers)
