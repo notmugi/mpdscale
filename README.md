@@ -42,7 +42,6 @@ The script will:
 3. Add a connection:
    - **Host:** the Tailscale IP or MagicDNS hostname printed by setup (e.g. `homeserver.tail1234.ts.net`)
    - **Port:** `6600`
-   - **Password:** none by default (tailnet ACLs are the gate); set `MPD_PASSWORD` in `.env` if you want one
 4. Enable the **"Phone Stream"** HTTP output (clients expose output toggles) to
    hear audio on the phone. Some clients let you set the stream URL directly:
    `http://<hostname>.ts.net:8000`

@@ -30,7 +30,6 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 MUSIC_DIR="${MUSIC_DIR:-$HOME/Music}"
-MPD_PASSWORD="${MPD_PASSWORD:-}"
 TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
 
 if [[ ! -d "$MUSIC_DIR" ]]; then
@@ -40,13 +39,7 @@ if [[ ! -d "$MUSIC_DIR" ]]; then
 fi
 info "Music directory: $MUSIC_DIR"
 
-# Password is OPTIONAL — your tailnet is already authenticated + encrypted.
-# Set MPD_PASSWORD in .env only if you want an extra layer (e.g. shared tailnet).
-if [[ -n "$MPD_PASSWORD" ]]; then
-    PASSWORD_LINE="password            \"$MPD_PASSWORD@read,add,control,admin\""
-else
-    PASSWORD_LINE="# password disabled — tailnet ACLs are the gate"
-fi
+# No password — tailnet is already authenticated + encrypted.
 
 # -------------------------------------------------------------- install pkgs
 info "Installing packages (mpd, mpc, tailscale)..."
@@ -126,8 +119,6 @@ info "Writing MPD config to $MPD_CONFIG_DIR/mpd.conf"
 mkdir -p "$MPD_CONFIG_DIR" "$MPD_DATA_DIR/playlists"
 
 sed -e "s|__MUSIC_DIR__|$MUSIC_DIR|g" \
-    -e "s|__TS_IP__|$TS_IP|g" \
-    -e "s|__PASSWORD_LINE__|$PASSWORD_LINE|g" \
     "$SCRIPT_DIR/mpd.conf" > "$MPD_CONFIG_DIR/mpd.conf"
 ok "Config written"
 warn "ncmpcpp note: your existing client connects to localhost — that still works."
@@ -135,12 +126,9 @@ warn "If ncmpcpp needs the DB/playlists, they now live in $MPD_DATA_DIR (was pos
 
 # ------------------------------------------------------------- user service
 info "Enabling MPD user service..."
-# Disable the socket unit: it binds *:6600 (LAN-exposed) and ignores our
-# bind_to_address settings. The service alone respects localhost+tailnet-only.
-systemctl --user disable --now mpd.socket 2>/dev/null || true
 systemctl --user daemon-reload
-systemctl --user enable --now mpd.service
-ok "MPD running (user service, bound to localhost + tailnet only)"
+systemctl --user enable --now mpd.socket mpd.service
+ok "MPD running (user service)"
 
 # Keep user services alive without an active login session (headless servers)
 if loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q "Linger=no"; then
@@ -155,7 +143,7 @@ echo " Setup complete!"
 echo
 echo " Control (port 6600):"
 echo "   Host:     $TS_IP   (or ${TS_HOSTNAME:-<hostname>.ts.net})"
-echo "   Password: $MPD_PASSWORD"
+echo "   Password: (none)"
 echo
 echo " Stream URL (for 'stream playback' in your client):"
 echo "   http://${TS_HOSTNAME:-$TS_IP}:8000"
@@ -163,7 +151,7 @@ echo
 echo " Phone setup:"
 echo "   1. Install the Tailscale app and sign into the same tailnet"
 echo "   2. Android: M.A.L.P. / MPDroid  •  iOS: MaximumMPD / Rigelian"
-echo "   3. Add a connection with the host + password above"
+echo "   3. Add a connection with the host above (no password)"
 echo "   4. Enable streaming output ('Phone Stream') to hear audio"
 echo
 echo " Useful commands:"
@@ -174,5 +162,5 @@ echo "${GRN}======================================================${RST}"
 
 # Initial DB scan (may take a while on first run)
 info "Starting initial library scan in the background..."
-(sleep 2 && mpc --host="$TS_IP" --password="$MPD_PASSWORD" update >/dev/null 2>&1 || mpc update >/dev/null 2>&1) &
+(sleep 2 && mpc update >/dev/null 2>&1) &
 disown
