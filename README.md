@@ -30,6 +30,9 @@ Press play. That's it.
 ./setup.sh --stop     # stop playback + phone access (MPD keeps running locally)
 ./setup.sh --restart  # stop, then start again
 mpc update            # rescan library
+./setup.sh --phone    # audio to phone only
+./setup.sh --local    # audio to this machine only
+./setup.sh --auto     # decide from whether Tailscale is up
 ```
 
 Nothing starts on its own after a reboot — run `./setup.sh` when you want it.

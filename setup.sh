@@ -17,15 +17,20 @@ die()   { echo "${RED} ✗${RST} $*" >&2; exit 1; }
 # ./setup.sh --start    "
 # ./setup.sh --stop     stop playback + remote access (MPD stays up for ncmpcpp)
 # ./setup.sh --restart  stop, then start again
+HELPER="$HOME/.local/share/mpdscale/mpdscale-outputs.sh"
+
 ACTION="start"
 case "${1:---start}" in
     --start)   ACTION="start" ;;
     --stop)    ACTION="stop" ;;
     --restart) ACTION="restart" ;;
-    *) die "Unknown flag '$1'. Use --start, --stop, or --restart." ;;
+    --phone|--local|--auto)
+        [[ -x "$HELPER" ]] || die "Not installed yet — run ./setup.sh once first."
+        "$HELPER" "${1#--}"
+        exit 0
+        ;;
+    *) die "Unknown flag '$1'. Use --start, --stop, --restart, --phone, --local, or --auto." ;;
 esac
-
-HELPER="$HOME/.local/share/mpdscale/mpdscale-outputs.sh"
 
 do_stop() {
     info "Stopping playback..."
