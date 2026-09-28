@@ -81,7 +81,6 @@ tailscale status                # tailnet peers
 ## Security
 
 - Control port is bound to localhost + tailnet IP only.
-- Password required for all client commands.
 - All traffic between phone and server is WireGuard-encrypted via Tailscale.
 - Port 8000 (HTTP stream) binds on all interfaces — it's only audio out, but
   if you want to restrict it to the tailnet too, change `bind_to_address` in
