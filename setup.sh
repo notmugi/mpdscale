@@ -136,16 +136,13 @@ warn "ncmpcpp note: your existing client connects to localhost — that still wo
 warn "If ncmpcpp needs the DB/playlists, they now live in $MPD_DATA_DIR (was possibly elsewhere)."
 
 # ------------------------------------------------------------- user service
-info "Enabling MPD user service..."
+info "Starting MPD user service (NOT enabled — opt-in, won't auto-start at login)..."
 systemctl --user daemon-reload
-systemctl --user enable --now mpd.socket mpd.service
-ok "MPD running (user service)"
+systemctl --user start mpd.socket
+ok "MPD running (user service, socket-activated; start with: systemctl --user start mpd.socket)"
 
-# Keep user services alive without an active login session (headless servers)
-if loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q "Linger=no"; then
-    warn "Enabling lingering so MPD runs without an active login session"
-    sudo loginctl enable-linger "$USER"
-fi
+# Linger is NOT enabled: MPD runs only while you're logged in.
+# For a headless always-on server, run: sudo loginctl enable-linger "$USER"
 
 # ------------------------------------------------------------------ summary
 echo
@@ -166,7 +163,9 @@ echo "   3. Add a connection with the host above (no password)"
 echo "   4. Enable streaming output ('Phone Stream') to hear audio"
 echo
 echo " Useful commands:"
-echo "   systemctl --user status mpd     # check MPD"
+echo "   systemctl --user start mpd.socket   # start MPD (does not auto-start)
+   systemctl --user stop mpd.socket mpd.service  # stop MPD
+   systemctl --user status mpd     # check MPD"
 echo "   mpc update                      # rescan library"
 echo "   tailscale status                # check tailnet"
 echo "${GRN}======================================================${RST}"
