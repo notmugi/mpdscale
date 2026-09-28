@@ -15,7 +15,7 @@ die()   { echo "${RED} ✗${RST} $*" >&2; exit 1; }
 # ------------------------------------------------------------------- flags
 # ./setup.sh            same as --start: full setup + everything running
 # ./setup.sh --start    "
-# ./setup.sh --stop     stop MPD and Tailscale
+# ./setup.sh --stop     stop playback + remote access (MPD stays up for ncmpcpp)
 # ./setup.sh --restart  stop, then start again
 ACTION="start"
 case "${1:---start}" in
@@ -26,11 +26,11 @@ case "${1:---start}" in
 esac
 
 do_stop() {
-    info "Stopping MPD..."
-    systemctl --user stop mpd.socket mpd.service 2>/dev/null || true
-    info "Stopping Tailscale..."
+    info "Stopping playback..."
+    mpc stop >/dev/null 2>&1 || true
+    info "Stopping Tailscale (remote access off; MPD keeps running locally for ncmpcpp)..."
     sudo systemctl stop tailscaled 2>/dev/null || true
-    ok "Stopped"
+    ok "Stopped — phone disconnected, local playback still available"
 }
 
 if [[ "$ACTION" == "stop" ]]; then

@@ -27,8 +27,8 @@ Press play. That's it.
 
 ```bash
 ./setup.sh            # start everything (run this after a reboot)
-./setup.sh --stop     # stop everything
-./setup.sh --restart  # restart everything
+./setup.sh --stop     # stop playback + phone access (MPD keeps running locally)
+./setup.sh --restart  # stop, then start again
 mpc update            # rescan library
 ```
 
