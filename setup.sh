@@ -12,6 +12,36 @@ ok()    { echo "${GRN} ✓${RST} $*"; }
 warn()  { echo "${YLW} !${RST} $*"; }
 die()   { echo "${RED} ✗${RST} $*" >&2; exit 1; }
 
+# ------------------------------------------------------------------- flags
+# ./setup.sh            same as --start: full setup + everything running
+# ./setup.sh --start    "
+# ./setup.sh --stop     stop MPD and Tailscale
+# ./setup.sh --restart  stop, then start again
+ACTION="start"
+case "${1:---start}" in
+    --start)   ACTION="start" ;;
+    --stop)    ACTION="stop" ;;
+    --restart) ACTION="restart" ;;
+    *) die "Unknown flag '$1'. Use --start, --stop, or --restart." ;;
+esac
+
+do_stop() {
+    info "Stopping MPD..."
+    systemctl --user stop mpd.socket mpd.service 2>/dev/null || true
+    info "Stopping Tailscale..."
+    sudo systemctl stop tailscaled 2>/dev/null || true
+    ok "Stopped"
+}
+
+if [[ "$ACTION" == "stop" ]]; then
+    do_stop
+    exit 0
+elif [[ "$ACTION" == "restart" ]]; then
+    do_stop
+    info "Starting again..."
+    # fall through to the normal start flow below
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MPD_CONFIG_DIR="$HOME/.config/mpd"
 MPD_DATA_DIR="$HOME/.local/share/mpd"

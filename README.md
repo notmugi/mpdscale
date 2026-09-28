@@ -26,9 +26,10 @@ Press play. That's it.
 ## Commands
 
 ```bash
-systemctl --user start mpd.socket              # start MPD
-systemctl --user stop mpd.socket mpd.service   # stop MPD
-mpc update                                     # rescan library
+./setup.sh            # start everything (run this after a reboot)
+./setup.sh --stop     # stop everything
+./setup.sh --restart  # restart everything
+mpc update            # rescan library
 ```
 
-MPD does not start on its own after a reboot — run the start command when you want it.
+Nothing starts on its own after a reboot — run `./setup.sh` when you want it.
