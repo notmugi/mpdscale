@@ -25,12 +25,37 @@ case "${1:---start}" in
     *) die "Unknown flag '$1'. Use --start, --stop, or --restart." ;;
 esac
 
+# Enable/disable MPD outputs by exact name.
+# $1 = space-separated names to enable, $2 = names to disable.
+set_outputs() {
+    local enable_names="$1" disable_names="$2" line id name
+    while read -r line; do
+        id="$(grep -oP 'Output \K[0-9]+' <<< "$line")"
+        name="$(sed -E 's/Output [0-9]+ \((.*)\) is .*/\1/' <<< "$line")"
+        [[ -z "$id" || -z "$name" ]] && continue
+        if [[ " ${enable_names} " == *" ${name} "* ]]; then
+            mpc enable "$id" >/dev/null 2>&1
+        elif [[ " ${disable_names} " == *" ${name} "* ]]; then
+            mpc disable "$id" >/dev/null 2>&1
+        fi
+    done <<< "$(mpc outputs 2>/dev/null)"
+}
+
+phone_only() {  # streams on, local speakers off
+    set_outputs "Phone Stream Phone Stream (Cellular)" "Local Playback"
+}
+local_only() {  # local speakers on, streams off
+    set_outputs "Local Playback" "Phone Stream Phone Stream (Cellular)"
+}
+
 do_stop() {
     info "Stopping playback..."
     mpc stop >/dev/null 2>&1 || true
+    info "Switching audio to local machine only..."
+    local_only
     info "Stopping Tailscale (remote access off; MPD keeps running locally for ncmpcpp)..."
     sudo systemctl stop tailscaled 2>/dev/null || true
-    ok "Stopped — phone disconnected, local playback still available"
+    ok "Stopped — phone disconnected, audio plays on this machine"
 }
 
 if [[ "$ACTION" == "stop" ]]; then
@@ -177,6 +202,11 @@ ok "MPD running (user service, socket-activated; start with: systemctl --user st
 
 # Linger is NOT enabled: MPD runs only while you're logged in.
 # For a headless always-on server, run: sudo loginctl enable-linger "$USER"
+
+# Audio goes to the phone only while remote access is up
+info "Switching audio to phone streams only (local speakers off)..."
+phone_only
+ok "Outputs: streams on, local off"
 
 # ------------------------------------------------------------------ summary
 echo
