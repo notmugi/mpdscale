@@ -40,9 +40,12 @@ if [[ ! -d "$MUSIC_DIR" ]]; then
 fi
 info "Music directory: $MUSIC_DIR"
 
-if [[ -z "$MPD_PASSWORD" ]]; then
-    MPD_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 20)"
-    warn "Generated random MPD password: $MPD_PASSWORD  (saved in $MPD_CONFIG_DIR/mpd.conf)"
+# Password is OPTIONAL — your tailnet is already authenticated + encrypted.
+# Set MPD_PASSWORD in .env only if you want an extra layer (e.g. shared tailnet).
+if [[ -n "$MPD_PASSWORD" ]]; then
+    PASSWORD_LINE="password            \"$MPD_PASSWORD@read,add,control,admin\""
+else
+    PASSWORD_LINE="# password disabled — tailnet ACLs are the gate"
 fi
 
 # -------------------------------------------------------------- install pkgs
@@ -124,22 +127,20 @@ mkdir -p "$MPD_CONFIG_DIR" "$MPD_DATA_DIR/playlists"
 
 sed -e "s|__MUSIC_DIR__|$MUSIC_DIR|g" \
     -e "s|__TS_IP__|$TS_IP|g" \
-    -e "s|__PASSWORD__|$MPD_PASSWORD|g" \
+    -e "s|__PASSWORD_LINE__|$PASSWORD_LINE|g" \
     "$SCRIPT_DIR/mpd.conf" > "$MPD_CONFIG_DIR/mpd.conf"
-chmod 600 "$MPD_CONFIG_DIR/mpd.conf"   # contains the password
 ok "Config written"
 warn "ncmpcpp note: your existing client connects to localhost — that still works."
 warn "If ncmpcpp needs the DB/playlists, they now live in $MPD_DATA_DIR (was possibly elsewhere)."
 
 # ------------------------------------------------------------- user service
 info "Enabling MPD user service..."
+# Disable the socket unit: it binds *:6600 (LAN-exposed) and ignores our
+# bind_to_address settings. The service alone respects localhost+tailnet-only.
+systemctl --user disable --now mpd.socket 2>/dev/null || true
 systemctl --user daemon-reload
-if [[ -n "$MPD_WAS_RUNNING" ]]; then
-    systemctl --user restart mpd.service
-else
-    systemctl --user enable --now mpd.service
-fi
-ok "MPD running (user service)"
+systemctl --user enable --now mpd.service
+ok "MPD running (user service, bound to localhost + tailnet only)"
 
 # Keep user services alive without an active login session (headless servers)
 if loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q "Linger=no"; then
