@@ -19,11 +19,29 @@ die()   { echo "${RED} ✗${RST} $*" >&2; exit 1; }
 # ./setup.sh --restart  stop, then start again
 HELPER="$HOME/.local/share/mpdscale/mpdscale-outputs.sh"
 
+usage() {
+    cat <<EOF
+Usage: ./setup.sh [flag]
+
+  (none)      Same as --start
+  --start     Full setup: install packages, bring Tailscale up, start MPD,
+              route audio to phone
+  --stop      Stop playback, disconnect phone (Tailscale down), route audio
+              to this machine. MPD keeps running for ncmpcpp.
+  --restart   --stop followed by --start
+  --phone     Route audio to phone only
+  --local     Route audio to this machine only
+  --auto      Route audio based on whether Tailscale is up
+  --help      Show this message
+EOF
+}
+
 ACTION="start"
 case "${1:---start}" in
     --start)   ACTION="start" ;;
     --stop)    ACTION="stop" ;;
     --restart) ACTION="restart" ;;
+    --help|-h) usage; exit 0 ;;
     --phone|--local|--auto)
         [[ -x "$HELPER" ]] || die "Not installed yet — run ./setup.sh once first."
         "$HELPER" "${1#--}"
