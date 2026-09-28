@@ -36,3 +36,8 @@ mpc update            # rescan library
 ```
 
 Nothing starts on its own after a reboot — run `./setup.sh` when you want it.
+
+## Notes
+
+- No audio on the phone? Make sure something is actually **playing** — a paused stream looks dead to apps. Press play, it comes back.
+- Switching audio modes while the phone is listening will drop it. Just press play in the app again.
